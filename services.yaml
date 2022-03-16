@@ -1,0 +1,151 @@
+get_player_status:
+  name: Get player status
+  description: Get current player status
+  fields:
+    serial:
+      name: Serial
+      description: serial of the NAS to reboot; required when multiple NAS are configured.
+      example: 1NDVC86409
+      selector:
+        text:
+    player_uuid:
+      name: Player uuid
+      description: UUID of target player
+      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+      selector:
+        text:
+
+
+get_players:
+  name: Get players
+  description: Get list of available players
+  serial:
+    name: Serial
+    description: serial of the NAS to reboot; required when multiple NAS are configured.
+    example: 1NDVC86409
+    selector:
+      text:
+
+remote_player_play_songs:
+  name: Play songs on remote player
+  description: PLay songs on remote player using their id's
+  fields:
+    serial:
+      name: Serial
+      description: serial of the NAS to reboot; required when multiple NAS are configured.
+      example: 1NDVC86409
+      selector:
+        text:
+    player_uuid:
+      name: Player uuid
+      description: UUID of target player
+      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+      required: true
+      selector:
+        text:
+    songs:
+      name: Song ids
+      description: Ids of the songs you want to play (splitted by ,)
+      example: music_2,music_5
+      required: true
+      selector:
+        text:
+    clear_playlist:
+      name: Clear playlist
+      description: Clear playlist or just add songs
+      selector:
+        boolean:
+
+remote_player_play_album:
+  name: Play album on remote player
+  description: Play album on remote player using album name and album artist
+  fields:
+    serial:
+      name: Serial
+      description: serial of the NAS to reboot; required when multiple NAS are configured.
+      example: 1NDVC86409
+      selector:
+        text:
+    player_uuid:
+      name: Player uuid
+      description: UUID of target player
+      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+      required: true
+      selector:
+        text:
+    album_name:
+      name: Album name
+      description: Name of the album
+      example: Face Value
+      required: true
+      selector:
+        text:
+    album_artist:
+      name: Artist
+      description: Album artists
+      example: Phil Collins
+      required: true
+      selector:
+        text:
+    clear_playlist:
+      name: Clear playlist
+      description: Clear playlist or just add songs
+      selector:
+        boolean:
+
+remote_player_control:
+  name: Control remote player
+  description: Control remote player playing status
+  fields:
+    serial:
+      name: Serial
+      description: serial of the NAS to reboot; required when multiple NAS are configured.
+      example: 1NDVC86409
+      selector:
+        text:
+    player_uuid:
+      name: Player uuid
+      description: UUID of target player
+      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+      required: true
+      selector:
+        text:
+    action:
+      name: Action
+      description: Action for current playing media status
+      example: play
+      required: true
+      selector:
+          select:
+            options:
+              - play
+              - pause
+              - stop
+
+remote_player_volume:
+  name: Control remote player volume
+  description: Control remote player volume
+  fields:
+    serial:
+      name: Serial
+      description: serial of the NAS to reboot; required when multiple NAS are configured.
+      example: 1NDVC86409
+      selector:
+        text:
+    player_uuid:
+      name: Player uuid
+      description: UUID of target player
+      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+      required: true
+      selector:
+        text:
+    volume:
+      name: Volume
+      description: Volume of the player
+      example: 25
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+          mode: slider
