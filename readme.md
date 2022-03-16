@@ -1,6 +1,6 @@
 # Synology DS audio
 
-~Work in progress~
+~  Work in progress  ~
 
 Home assistant component to interact with your Synology DS AudioStation
 
