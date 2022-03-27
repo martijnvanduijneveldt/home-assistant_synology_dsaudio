@@ -5,7 +5,7 @@ import voluptuous as vol
 from homeassistant.core import ServiceCall, callback
 from synology_dsm import SynologyDSM
 
-from . import const, DOMAIN
+from . import const
 from .api.dsaudio import SynoAudioStation
 from .shared import LOGGER
 
@@ -69,7 +69,7 @@ class DsAudioServices:
     async def async_register(self):
         """Register all our services."""
         self._hass.services.async_register(
-            DOMAIN,
+            const.DOMAIN,
             const.SERVICE_FUNC_GETPLAYER_STATUS,
             self.get_player_status,
             playerStatusSchema

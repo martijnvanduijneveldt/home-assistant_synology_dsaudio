@@ -1,6 +1,6 @@
 from typing import List
 
-from api.dsaudio.player import Player
+from .player import Player
 
 
 class PlayerList:

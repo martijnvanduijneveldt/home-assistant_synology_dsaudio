@@ -69,7 +69,7 @@ def _user_schema_with_defaults(user_input: dict[str, Any]) -> vol.Schema:
 
 
 def _ordered_shared_schema(
-    schema_input: dict[str, Any]
+        schema_input: dict[str, Any]
 ) -> dict[vol.Required | vol.Optional, Any]:
     return {
         vol.Required(CONF_USERNAME, default=schema_input.get(CONF_USERNAME, "")): str,
@@ -101,7 +101,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: ConfigEntry,
+            config_entry: ConfigEntry,
     ) -> SynologyDSMOptionsFlowHandler:
         """Get the options flow for this handler."""
         return SynologyDSMOptionsFlowHandler(config_entry)
@@ -114,10 +114,10 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
         self.reauth_reason: str | None = None
 
     def _show_form(
-        self,
-        step_id: str,
-        user_input: dict[str, Any] | None = None,
-        errors: dict[str, str] | None = None,
+            self,
+            step_id: str,
+            user_input: dict[str, Any] | None = None,
+            errors: dict[str, str] | None = None,
     ) -> FlowResult:
         """Show the setup form to the user."""
         if not user_input:
@@ -143,7 +143,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_validate_input_create_entry(
-        self, user_input: dict[str, Any], step_id: str
+            self, user_input: dict[str, Any], step_id: str
     ) -> FlowResult:
         """Process user input and create new or update existing config entry."""
         host = user_input[CONF_HOST]
@@ -217,7 +217,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
         return self.async_create_entry(title=host, data=config_data)
 
     async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
+            self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle a flow initiated by the user."""
         step = "user"
@@ -243,15 +243,15 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
         fqdn_with_ssl_verification = (
-            existing_entry
-            and not _is_valid_ip(existing_entry.data[CONF_HOST])
-            and existing_entry.data[CONF_VERIFY_SSL]
+                existing_entry
+                and not _is_valid_ip(existing_entry.data[CONF_HOST])
+                and existing_entry.data[CONF_VERIFY_SSL]
         )
 
         if (
-            existing_entry
-            and existing_entry.data[CONF_HOST] != parsed_url.hostname
-            and not fqdn_with_ssl_verification
+                existing_entry
+                and existing_entry.data[CONF_HOST] != parsed_url.hostname
+                and not fqdn_with_ssl_verification
         ):
             LOGGER.debug(
                 "Update host from '%s' to '%s' for NAS '%s' via SSDP discovery",
@@ -276,7 +276,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
         return await self.async_step_link()
 
     async def async_step_link(
-        self, user_input: dict[str, Any] | None = None
+            self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Link a config entry from discovery."""
         step = "link"
@@ -291,7 +291,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
-        self, user_input: dict[str, Any] | None = None
+            self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Perform reauth confirm upon an API authentication error."""
         step = "reauth_confirm"
@@ -301,7 +301,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
         return await self.async_validate_input_create_entry(user_input, step_id=step)
 
     async def async_step_2sa(
-        self, user_input: dict[str, Any], errors: dict[str, str] | None = None
+            self, user_input: dict[str, Any], errors: dict[str, str] | None = None
     ) -> FlowResult:
         """Enter 2SA code to anthenticate."""
         if not self.saved_user_input:
@@ -337,7 +337,7 @@ class SynologyDSMOptionsFlowHandler(OptionsFlow):
         self.config_entry = config_entry
 
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
+            self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle options flow."""
         if user_input is not None:
@@ -362,7 +362,7 @@ def _login_and_fetch_syno_info(api: SynologyDSM, otp_code: str) -> str:
     api.login(otp_code)
 
     if (
-        not api.information.serial
+            not api.information.serial
     ):
         raise InvalidData
 
