@@ -26,12 +26,12 @@ SERVICE_FUNC_REMOTE_PLAY_ALBUM = "remote_player_play_album"
 SERVICE_FUNC_REMOTE_PLAYER_CONTROL = "remote_player_control"
 SERVICE_FUNC_REMOTE_PLAYER_VOLUME = "remote_player_volume"
 SERVICE_FUNC_REMOTE_SLEEP_TIMER = "remote_player_volume"
+SERVICE_FUNC_REMOTE_PLAYER_CLEAR_PLAYLIST = "remote_player_clear_playlist"
 
 # Service input keys
 SERVICE_INPUT_SONGS = "songs"
 SERVICE_INPUT_ALBUM_ARTIST = "album_artist"
 SERVICE_INPUT_ALBUM_NAME = "album_name"
-SERVICE_INPUT_CLEAR_PLAYLIST = "clear_playlist"
 SERVICE_INPUT_ACTION = "action"
 SERVICE_INPUT_PLAYERUUID = "player_uuid"
 SERVICE_INPUT_VOLUME = "volume"

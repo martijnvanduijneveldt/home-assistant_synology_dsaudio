@@ -8,7 +8,7 @@
   ],
   "config_flow": true,
   "requirements": [
-    "py-synologydsm-api==1.0.5"
+    "py-synologydsm-api==1.0.8"
   ],
   "iot_class": "local_polling",
   "version": "0.1.0"

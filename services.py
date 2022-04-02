@@ -15,7 +15,7 @@ nasByIdSchema = vol.Schema(
     }
 ),
 
-playerStatusSchema = vol.Schema(
+playerByUuidSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
         vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
@@ -27,9 +27,8 @@ playerUpdateSongsSchema = vol.Schema(
         vol.Optional(const.CONF_SERIAL): str,
         vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
         vol.Required(const.SERVICE_INPUT_SONGS): str,
-        vol.Optional(const.SERVICE_INPUT_CLEAR_PLAYLIST, default=False): bool,
     }
-),
+)
 
 playerAlbumSchema = vol.Schema(
     {
@@ -37,9 +36,8 @@ playerAlbumSchema = vol.Schema(
         vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
         vol.Required(const.SERVICE_INPUT_ALBUM_NAME): str,
         vol.Required(const.SERVICE_INPUT_ALBUM_ARTIST): str,
-        vol.Optional(const.SERVICE_INPUT_CLEAR_PLAYLIST, default=False): bool,
     }
-),
+)
 
 playerVolumeSchema = vol.Schema(
     {
@@ -47,7 +45,7 @@ playerVolumeSchema = vol.Schema(
         vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
         vol.Required(const.SERVICE_INPUT_VOLUME): int,
     }
-),
+)
 
 playerPlayerControlSchema = vol.Schema(
     {
@@ -55,7 +53,7 @@ playerPlayerControlSchema = vol.Schema(
         vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
         vol.Required(const.SERVICE_INPUT_ACTION): str,
     }
-),
+)
 
 
 class DsAudioServices:
@@ -72,7 +70,7 @@ class DsAudioServices:
             const.DOMAIN,
             const.SERVICE_FUNC_GETPLAYER_STATUS,
             self.get_player_status,
-            playerStatusSchema
+            playerByUuidSchema
         )
 
         self._hass.services.async_register(
@@ -108,6 +106,13 @@ class DsAudioServices:
             const.SERVICE_FUNC_REMOTE_PLAYER_VOLUME,
             self.remote_player_volume,
             playerVolumeSchema
+        )
+        
+        self._hass.services.async_register(
+            const.DOMAIN,
+            const.SERVICE_FUNC_REMOTE_PLAYER_CLEAR_PLAYLIST,
+            self.remote_player_clear_playlist,
+            playerByUuidSchema
         )
 
     def __resolve_dsm(self, call: ServiceCall) -> Optional[SynologyDSM]:
@@ -164,10 +169,8 @@ class DsAudioServices:
 
         player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
         songs = call.data.get(const.SERVICE_INPUT_SONGS)
-        clear_playlist = call.data.get(const.SERVICE_INPUT_CLEAR_PLAYLIST)
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_play_songs, player_uuid, songs,
-                                                      clear_playlist)
+        res = await self._hass.async_add_executor_job(audio.remote_player_play_songs, player_uuid, songs)
         LOGGER.info(res)
 
     async def remote_update_play_album(self, call: ServiceCall) -> None:
@@ -178,10 +181,9 @@ class DsAudioServices:
         player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
         album_artist = call.data.get(const.SERVICE_INPUT_ALBUM_ARTIST)
         album_name = call.data.get(const.SERVICE_INPUT_ALBUM_NAME)
-        clear_playlist = call.data.get(const.SERVICE_INPUT_CLEAR_PLAYLIST)
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_play_album, player_uuid, album_artist,
-                                                      album_name, clear_playlist)
+        res = await self._hass.async_add_executor_job(audio.remote_player_play_album, player_uuid, album_name,
+                                                      album_artist)
         LOGGER.info(res)
 
     async def remote_player_control(self, call: ServiceCall) -> None:
@@ -202,4 +204,14 @@ class DsAudioServices:
         player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
         volume = call.data.get(const.SERVICE_INPUT_VOLUME)
         res = await self._hass.async_add_executor_job(audio.remote_player_volume, player_uuid, volume)
+        LOGGER.info(res)
+
+    async def remote_player_clear_playlist(self, call: ServiceCall) -> None:
+        audio = self.__resolve_audio_station(call)
+        if not audio:
+            return
+
+        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
+
+        res = await self._hass.async_add_executor_job(audio.remote_player_clear_playlist, player_uuid)
         LOGGER.info(res)

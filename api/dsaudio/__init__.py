@@ -1,10 +1,12 @@
 """Synology AudioStation API wrapper."""
-from typing import List, Optional
+from typing import List, Dict, Any
 
+from .player_list import PlayerList
 from .playlist import Playlist
 from .remote_player_action import RemotePlayerAction
 from .remote_player_status import RemotePlayerStatus
-from .player_list import PlayerList
+
+import json
 
 
 def comma_join(value) -> str:
@@ -19,7 +21,7 @@ class SynoAudioStation:
     REMOTE_PLAYER_STATUS_KEY = "SYNO.AudioStation.RemotePlayerStatus"
 
     def __init__(self, dsm):
-        """Initialize a Download Station."""
+        """Initialize Audio Station."""
         self._dsm = dsm
 
     def get_player_status(self, player_uuid) -> RemotePlayerStatus:
@@ -56,69 +58,79 @@ class SynoAudioStation:
             "version": 3,
         }
 
-        res = self._dsm.post(self.REMOTE_PLAYER_KEY, "getplaylist", opts)
+        res = self._dsm.post(self.REMOTE_PLAYER_KEY, "getplaylist", data=opts)
 
         return Playlist(res["data"])
 
-    def __remote_update_playlist(self, player_uuid: str, song_ids: Optional[List[str]],
-                                 containers_json: Optional[List[dict[str, str]]],
-                                 clear_playlist: bool) -> bool:
+    def __remote_update_playlist(self, player_uuid: str, opts: Dict[str, Any]) -> bool:
         """Update playlist of remote player"""
 
-        opts = {
+        base_opts = {
             "id": "uuid:" + player_uuid,
-            "library": "shared",
-            "keep_shuffle_order": False,
-            "play": True,
             "version": 3,
         }
 
-        if song_ids:
-            opts["songs"]: comma_join(song_ids)
-
-        if containers_json:
-            opts["containers_json"]: containers_json
-
-        if clear_playlist:
-            opts["offset"] = 0
-            opts["updated_index"] = 8192
-            opts["updated_index"] = -1
-        else:
-            # current_playlist = self.remote_current_playlist(player_uuid)
-            # current_size = current_playlist.total
-            opts["offset"] = -1
-            opts["limit"] = 0
-
-        res = self._dsm.post(self.REMOTE_PLAYER_KEY, "updateplaylist", opts)
+        final_opts = {**base_opts, **opts}
+        res = self._dsm.post(self.REMOTE_PLAYER_KEY, "updateplaylist", data=final_opts)
 
         return res["success"]
 
-    def remote_player_play_songs(self, player_uuid: str, song_ids: List[str],
-                                 clear_playlist: bool) -> bool:
+    def remote_player_clear_playlist(self, player_uuid: str) -> bool:
+        """Clear current playlist"""
+
+        current = self.remote_current_playlist(player_uuid)
+
+        opts = {
+            "offset": 0,
+            "limit": current.total,
+            "updated_index": -1,
+            "song": ""
+        }
+
+        return self.__remote_update_playlist(player_uuid, opts)
+
+    def remote_player_play_songs(self, player_uuid: str, song_ids: List[str]) -> bool:
         """Play songs using their ids"""
 
-        return self.__remote_update_playlist(player_uuid, song_ids, None, clear_playlist)
+        opts = {
+            "offset": -1,
+            "limit": 0,
+            "songs": comma_join(song_ids),
+            "library": "shared",
+            "keep_shuffle_order": "false",
+            "play": "true"
+        }
 
-    def remote_player_play_album(self, player_uuid: str, album_name: str, album_artist: str,
-                                 clear_playlist: bool) -> bool:
+        return self.__remote_update_playlist(player_uuid, opts)
+
+    def remote_player_play_album(self, player_uuid: str, album_name: str, album_artist: str) -> bool:
         """Play an album using album name and album artist"""
 
         container_json = {
             "type": "album",
-            "sort_by": "title",
+            "sort_by": "track",
             "sort_direction": "ASC",
             "album": album_name,
             "album_artist": album_artist
         }
 
-        return self.__remote_update_playlist(player_uuid, None, [container_json], clear_playlist)
+        opts = {
+            "library": "shared",
+            "keep_shuffle_order": "false",
+            "play": "true",
+            "containers_json": json.dumps([container_json]),
+            "offset": 0,
+            "limit": 0
+        }
+
+        return self.__remote_update_playlist(player_uuid, opts)
 
     def remote_player_control(self, player_uuid: str, action: RemotePlayerAction) -> bool:
         """Change player current playing status"""
         res = self._dsm.post(
             self.REMOTE_PLAYER_KEY,
             "control",
-            {
+            data={
                 "id": "uuid:" + player_uuid,
                 "action": action
             },
@@ -135,7 +147,7 @@ class SynoAudioStation:
         res = self._dsm.post(
             self.REMOTE_PLAYER_KEY,
             "control",
-            {
+            data={
                 "id": "uuid:" + player_uuid,
                 "action": "set_volume",
                 "value": volume
