@@ -63,6 +63,14 @@ playerPlayerControlSchema = vol.Schema(
     }
 )
 
+playerJumpToSongSchema = vol.Schema(
+{
+        vol.Optional(const.CONF_SERIAL): str,
+        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_POSITION): str,
+    }
+)
+
 
 class DsAudioServices:
     """Class that holds our services that should be published to hass."""
@@ -118,11 +126,18 @@ class DsAudioServices:
 
         self._hass.services.async_register(
             const.DOMAIN,
+            const.SERVICE_FUNC_REMOTE_PLAYER_JUMP_TO_SONG,
+            self.remote_player_jump_to_song,
+            playerJumpToSongSchema
+        )
+
+        self._hass.services.async_register(
+            const.DOMAIN,
             const.SERVICE_FUNC_REMOTE_PLAYER_VOLUME,
             self.remote_player_volume,
             playerVolumeSchema
         )
-        
+
         self._hass.services.async_register(
             const.DOMAIN,
             const.SERVICE_FUNC_REMOTE_PLAYER_CLEAR_PLAYLIST,
@@ -230,6 +245,17 @@ class DsAudioServices:
         action = RemotePlayerAction(call.data.get(const.SERVICE_INPUT_ACTION))
 
         res = await self._hass.async_add_executor_job(audio.remote_player_control, player_uuid, action)
+        LOGGER.info(res)
+
+    async def remote_player_jump_to_song(self, call: ServiceCall) -> None:
+        audio = self.__resolve_audio_station(call)
+        if not audio:
+            return
+
+        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
+        position = int(call.data.get(const.SERVICE_INPUT_POSITION))
+
+        res = await self._hass.async_add_executor_job(audio.remote_player_jump_to_song, player_uuid, position)
         LOGGER.info(res)
 
     async def remote_player_volume(self, call: ServiceCall) -> None:
