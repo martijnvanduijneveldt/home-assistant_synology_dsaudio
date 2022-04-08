@@ -11,9 +11,9 @@ from homeassistant.const import (
     CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant, callback
-from synology_dsm import SynologyDSM
-from synology_dsm.api.dsm.information import SynoDSMInformation
-from synology_dsm.exceptions import (
+from ..synology_dsm import SynologyDSM
+from ..synology_dsm.api.dsm.information import SynoDSMInformation
+from ..synology_dsm.exceptions import (
     SynologyDSMAPIErrorException,
     SynologyDSMLoginFailedException,
     SynologyDSMRequestException

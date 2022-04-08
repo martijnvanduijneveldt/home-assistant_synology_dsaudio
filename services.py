@@ -3,10 +3,10 @@ from typing import Optional
 import voluptuous as vol
 
 from homeassistant.core import ServiceCall, callback
-from synology_dsm import SynologyDSM
+from .synology_dsm import SynologyDSM
 
 from . import const
-from .api.dsaudio import SynoAudioStation
+from .synology_dsm.api.audio_station import SynoAudioStation, SongSortMode, RemotePlayerAction, QueueMode
 from .shared import LOGGER
 
 nasByIdSchema = vol.Schema(

@@ -5,8 +5,8 @@ from ipaddress import ip_address
 from typing import Any
 from urllib.parse import urlparse
 
-from synology_dsm import SynologyDSM
-from synology_dsm.exceptions import (
+from .synology_dsm import SynologyDSM
+from .synology_dsm.exceptions import (
     SynologyDSMException,
     SynologyDSMLogin2SAFailedException,
     SynologyDSMLogin2SARequiredException,

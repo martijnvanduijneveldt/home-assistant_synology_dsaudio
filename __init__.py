@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from synology_dsm.exceptions import (
+from .synology_dsm.exceptions import (
     SynologyDSMLogin2SARequiredException,
     SynologyDSMLoginDisabledAccountException,
     SynologyDSMLoginFailedException,
