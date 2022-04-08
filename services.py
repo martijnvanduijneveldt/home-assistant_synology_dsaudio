@@ -30,6 +30,14 @@ playerUpdateSongsSchema = vol.Schema(
     }
 )
 
+playerArtistSchema = vol.Schema(
+    {
+        vol.Optional(const.CONF_SERIAL): str,
+        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_ARTIST): str,
+    }
+)
+
 playerAlbumSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
@@ -85,6 +93,13 @@ class DsAudioServices:
             const.SERVICE_FUNC_REMOTE_PLAY_SONGS,
             self.remote_update_play_songs,
             playerUpdateSongsSchema
+        )
+
+        self._hass.services.async_register(
+            const.DOMAIN,
+            const.SERVICE_FUNC_REMOTE_PLAY_ARTIST,
+            self.remote_update_play_artist,
+            playerArtistSchema
         )
 
         self._hass.services.async_register(
@@ -169,8 +184,25 @@ class DsAudioServices:
 
         player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
         songs = call.data.get(const.SERVICE_INPUT_SONGS)
+        mode = QueueMode.replace
+        play_directly = True
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_play_songs, player_uuid, songs)
+        res = await self._hass.async_add_executor_job(audio.remote_player_play_songs, player_uuid, songs, mode,
+                                                      play_directly)
+        LOGGER.info(res)
+
+    async def remote_update_play_artist(self, call: ServiceCall) -> None:
+        audio = self.__resolve_audio_station(call)
+        if not audio:
+            return
+
+        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
+        artist = call.data.get(const.SERVICE_INPUT_ARTIST)
+        mode = QueueMode.replace
+        play_directly = True
+
+        res = await self._hass.async_add_executor_job(audio.remote_player_play_artist, player_uuid, artist,
+                                                      SongSortMode.album, mode, play_directly)
         LOGGER.info(res)
 
     async def remote_update_play_album(self, call: ServiceCall) -> None:
@@ -182,8 +214,11 @@ class DsAudioServices:
         album_artist = call.data.get(const.SERVICE_INPUT_ALBUM_ARTIST)
         album_name = call.data.get(const.SERVICE_INPUT_ALBUM_NAME)
 
+        mode = QueueMode.replace
+        play_directly = True
+
         res = await self._hass.async_add_executor_job(audio.remote_player_play_album, player_uuid, album_name,
-                                                      album_artist)
+                                                      album_artist, SongSortMode.track, mode, play_directly)
         LOGGER.info(res)
 
     async def remote_player_control(self, call: ServiceCall) -> None:
@@ -192,7 +227,8 @@ class DsAudioServices:
             return
 
         player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
-        action = call.data.get(const.SERVICE_INPUT_ACTION)
+        action = RemotePlayerAction(call.data.get(const.SERVICE_INPUT_ACTION))
+
         res = await self._hass.async_add_executor_job(audio.remote_player_control, player_uuid, action)
         LOGGER.info(res)
 
