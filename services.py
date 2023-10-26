@@ -1,31 +1,37 @@
-from typing import Optional
-
 import voluptuous as vol
-
-from homeassistant.core import ServiceCall, callback
-from .synology_dsm import SynologyDSM
+from homeassistant.const import ATTR_DEVICE_ID
+from homeassistant.core import ServiceCall, callback, HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import (
+    config_validation as cv,
+    entity_registry as er,
+)
+from homeassistant.helpers.entity_registry import RegistryEntry
+from homeassistant.util.read_only_dict import ReadOnlyDict
 
 from . import const
-from .synology_dsm.api.audio_station import SynoAudioStation, SongSortMode, RemotePlayerAction, QueueMode
+from .api.SynoApi import SynoApi
 from .shared import LOGGER
+from .synology_dsm.api.audio_station import SynoAudioStation, SongSortMode, RemotePlayerAction, Player
+from .synology_dsm.api.audio_station.models.queue_mode import QueueMode
 
 nasByIdSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
     }
-),
+)
 
 playerByUuidSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
-        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_PLAYER_ID): cv.entity_domain("media_player"),
     }
 )
 
 playerUpdateSongsSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
-        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_PLAYER_ID): cv.entity_domain("media_player"),
         vol.Required(const.SERVICE_INPUT_SONGS): str,
     }
 )
@@ -33,7 +39,7 @@ playerUpdateSongsSchema = vol.Schema(
 playerArtistSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
-        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_PLAYER_ID): cv.entity_domain("media_player"),
         vol.Required(const.SERVICE_INPUT_ARTIST): str,
     }
 )
@@ -41,7 +47,7 @@ playerArtistSchema = vol.Schema(
 playerAlbumSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
-        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_PLAYER_ID): cv.entity_domain("media_player"),
         vol.Required(const.SERVICE_INPUT_ALBUM_NAME): str,
         vol.Required(const.SERVICE_INPUT_ALBUM_ARTIST): str,
     }
@@ -50,230 +56,209 @@ playerAlbumSchema = vol.Schema(
 playerVolumeSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
-        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_PLAYER_ID): cv.entity_domain("media_player"),
         vol.Required(const.SERVICE_INPUT_VOLUME): int,
+    }
+)
+
+playerShuffleSchema = vol.Schema(
+    {
+        vol.Optional(const.CONF_SERIAL): str,
+        vol.Required(const.SERVICE_INPUT_PLAYER_ID): cv.entity_domain("media_player"),
+        vol.Required(const.SERVICE_INPUT_SHUFFLE): bool,
     }
 )
 
 playerPlayerControlSchema = vol.Schema(
     {
         vol.Optional(const.CONF_SERIAL): str,
-        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_PLAYER_ID): cv.entity_domain("media_player"),
         vol.Required(const.SERVICE_INPUT_ACTION): str,
     }
 )
 
 playerJumpToSongSchema = vol.Schema(
-{
+    {
         vol.Optional(const.CONF_SERIAL): str,
-        vol.Required(const.SERVICE_INPUT_PLAYERUUID): str,
+        vol.Required(const.SERVICE_INPUT_PLAYER_ID): cv.entity_domain("media_player"),
         vol.Required(const.SERVICE_INPUT_POSITION): str,
     }
 )
 
+SERVICE_RECONNECT_CLIENT = "reconnect_client"
+SERVICE_REMOVE_CLIENTS = "remove_clients"
 
-class DsAudioServices:
-    """Class that holds our services that should be published to hass."""
+SERVICE_RECONNECT_CLIENT_SCHEMA = vol.All(
+    vol.Schema({vol.Required(ATTR_DEVICE_ID): str})
+)
 
-    def __init__(self, hass):
-        """Initialize with hass """
-        self._hass = hass
+SUPPORTED_SERVICES = (
+    const.SERVICE_FUNC_GETPLAYER_STATUS,
+    const.SERVICE_FUNC_GETPLAYERS,
+    const.SERVICE_FUNC_REMOTE_PLAY_SONGS,
+    const.SERVICE_FUNC_REMOTE_PLAY_ARTIST,
+    const.SERVICE_FUNC_REMOTE_PLAY_ALBUM,
+    const.SERVICE_FUNC_REMOTE_PLAYER_CONTROL,
+    const.SERVICE_FUNC_REMOTE_PLAYER_JUMP_TO_SONG,
+    const.SERVICE_FUNC_REMOTE_PLAYER_VOLUME,
+    const.SERVICE_FUNC_REMOTE_SHUFFLE,
+    const.SERVICE_FUNC_REMOTE_PLAYER_CLEAR_PLAYLIST,
+)
 
-    @callback
-    async def async_register(self):
-        """Register all our services."""
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_GETPLAYER_STATUS,
-            self.get_player_status,
-            playerByUuidSchema
-        )
+SERVICE_TO_SCHEMA = {
+    const.SERVICE_FUNC_GETPLAYER_STATUS: playerByUuidSchema,
+    const.SERVICE_FUNC_GETPLAYERS: nasByIdSchema,
+    const.SERVICE_FUNC_REMOTE_PLAY_SONGS: playerUpdateSongsSchema,
+    const.SERVICE_FUNC_REMOTE_PLAY_ARTIST: playerArtistSchema,
+    const.SERVICE_FUNC_REMOTE_PLAY_ALBUM: playerAlbumSchema,
+    const.SERVICE_FUNC_REMOTE_PLAYER_CONTROL: playerPlayerControlSchema,
+    const.SERVICE_FUNC_REMOTE_PLAYER_JUMP_TO_SONG: playerJumpToSongSchema,
+    const.SERVICE_FUNC_REMOTE_PLAYER_VOLUME: playerVolumeSchema,
+    const.SERVICE_FUNC_REMOTE_SHUFFLE: playerShuffleSchema,
+    const.SERVICE_FUNC_REMOTE_PLAYER_CLEAR_PLAYLIST: playerByUuidSchema,
+}
 
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_GETPLAYERS,
-            self.get_players,
-            nasByIdSchema
-        )
 
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_REMOTE_PLAY_SONGS,
-            self.remote_update_play_songs,
-            playerUpdateSongsSchema
-        )
+def get_entity_config(
+        hass: HomeAssistant, config_entry_id: str
+) -> SynoApi | None:
+    """Find the SynologyDSM instance for the config entry id."""
+    domain_data = hass.data[const.DOMAIN]
+    if config_entry_id in domain_data:
+        return domain_data[config_entry_id][const.SYNO_API]
+    return None
 
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_REMOTE_PLAY_ARTIST,
-            self.remote_update_play_artist,
-            playerArtistSchema
-        )
 
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_REMOTE_PLAY_ALBUM,
-            self.remote_update_play_album,
-            playerAlbumSchema
-        )
+@callback
+def _get_dsm_instance_for_entity(hass: HomeAssistant, entity_entry: RegistryEntry) -> SynoApi:
+    if not (dsm := get_entity_config(hass, entity_entry.config_entry_id)):
+        raise HomeAssistantError(
+            f"No config found for entity: {entity_entry.id}, config {entity_entry.config_entry_id}")
 
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_REMOTE_PLAYER_CONTROL,
-            self.remote_player_control,
-            playerPlayerControlSchema
-        )
+    return dsm
 
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_REMOTE_PLAYER_JUMP_TO_SONG,
-            self.remote_player_jump_to_song,
-            playerJumpToSongSchema
-        )
 
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_REMOTE_PLAYER_VOLUME,
-            self.remote_player_volume,
-            playerVolumeSchema
-        )
+@callback
+def _get_entity_by_player_id(hass: HomeAssistant, entity_id: str) -> RegistryEntry:
+    entity_registry = er.async_get(hass)
+    if not (entity_entry := entity_registry.async_get(entity_id)):
+        raise HomeAssistantError(f"No entity found for id: {entity_id}")
 
-        self._hass.services.async_register(
-            const.DOMAIN,
-            const.SERVICE_FUNC_REMOTE_PLAYER_CLEAR_PLAYLIST,
-            self.remote_player_clear_playlist,
-            playerByUuidSchema
-        )
+    return entity_entry
 
-    def __resolve_dsm(self, call: ServiceCall) -> Optional[SynologyDSM]:
-        serial = call.data.get(const.CONF_SERIAL)
-        dsm_devices = self._hass.data[const.DOMAIN]
 
-        if serial:
-            dsm_device = dsm_devices.get(serial)
-        elif len(dsm_devices) == 1:
-            dsm_device = next(iter(dsm_devices.values()))
-            serial = next(iter(dsm_devices))
-        else:
-            LOGGER.error(
-                "More than one DSM configured, must specify one of serials %s",
-                sorted(dsm_devices),
-            )
-            return
+@callback
+async def async_setup_services(hass: HomeAssistant) -> None:
+    """Set up services for integration."""
 
-        if not dsm_device:
-            LOGGER.error("DSM with specified serial %s not found", serial)
-            return
+    dsm_services = {
+        const.SERVICE_FUNC_GETPLAYERS: get_players,
+    }
 
-        syno_api = dsm_device[const.SYNO_API]
-        return syno_api.dsm
+    media_player_services = {
+        const.SERVICE_FUNC_GETPLAYER_STATUS: get_player_status,
+        const.SERVICE_FUNC_REMOTE_PLAY_SONGS: remote_update_play_songs,
+        const.SERVICE_FUNC_REMOTE_PLAY_ARTIST: remote_update_play_artist,
+        const.SERVICE_FUNC_REMOTE_PLAY_ALBUM: remote_update_play_album,
+        const.SERVICE_FUNC_REMOTE_PLAYER_CONTROL: remote_player_control,
+        const.SERVICE_FUNC_REMOTE_PLAYER_JUMP_TO_SONG: remote_player_jump_to_song,
+        const.SERVICE_FUNC_REMOTE_PLAYER_VOLUME: remote_player_volume,
+        const.SERVICE_FUNC_REMOTE_SHUFFLE: remote_player_shuffle,
+        const.SERVICE_FUNC_REMOTE_PLAYER_CLEAR_PLAYLIST: remote_player_clear_playlist,
+    }
 
-    def __resolve_audio_station(self, call: ServiceCall) -> Optional[SynoAudioStation]:
-        dsm_api = self.__resolve_dsm(call)
-        if not dsm_api:
-            return None
+    async def async_call_syno_service(service_call: ServiceCall) -> None:
+        """Call correct DSM service."""
 
-        return SynoAudioStation(dsm_api)
+        # call with a media player
+        ha_player_id = service_call.data.get(const.SERVICE_INPUT_PLAYER_ID)
 
-    async def get_player_status(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
+        entity = _get_entity_by_player_id(hass, ha_player_id)
+        syno_api = _get_dsm_instance_for_entity(hass, entity)
 
-        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
-        res = await self._hass.async_add_executor_job(audio.get_player_status, player_uuid)
+        audio_station = syno_api.dsm.audio_station
+
+        dsm_player_id = entity.unique_id
+
+        res = await hass.async_add_executor_job(
+            media_player_services[service_call.service], audio_station, dsm_player_id, service_call.data)
+
         LOGGER.info(res)
 
-    async def get_players(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
+    for service in SUPPORTED_SERVICES:
+        hass.services.async_register(
+            const.DOMAIN,
+            service,
+            async_call_syno_service,
+            schema=SERVICE_TO_SCHEMA[service],
+        )
 
-        res = await self._hass.async_add_executor_job(audio.get_players)
-        LOGGER.info(res)
 
-    async def remote_update_play_songs(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
+@callback
+def async_unload_services(hass) -> None:
+    """Unload UniFi Network services."""
+    for service in SUPPORTED_SERVICES:
+        hass.services.async_remove(const.DOMAIN, service)
 
-        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
-        songs = call.data.get(const.SERVICE_INPUT_SONGS)
-        mode = QueueMode.replace
-        play_directly = True
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_play_songs, player_uuid, songs, mode,
-                                                      play_directly)
-        LOGGER.info(res)
+async def get_players(audio_station: SynoAudioStation, data: ReadOnlyDict) -> list[Player]:
+    return audio_station.remote_player_get_players()
 
-    async def remote_update_play_artist(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
 
-        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
-        artist = call.data.get(const.SERVICE_INPUT_ARTIST)
-        mode = QueueMode.replace
-        play_directly = True
+def get_player_status(audio_station: SynoAudioStation, player_id: str, data: ReadOnlyDict) -> None:
+    return audio_station.remote_player_get_player_status(player_id)
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_play_artist, player_uuid, artist,
-                                                      SongSortMode.album, mode, play_directly)
-        LOGGER.info(res)
 
-    async def remote_update_play_album(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
+def remote_update_play_songs(audio_station: SynoAudioStation, player_id: str, data: ReadOnlyDict) -> bool:
+    songs = data.get(const.SERVICE_INPUT_SONGS)
+    mode = QueueMode.replace
+    play_directly = True
 
-        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
-        album_artist = call.data.get(const.SERVICE_INPUT_ALBUM_ARTIST)
-        album_name = call.data.get(const.SERVICE_INPUT_ALBUM_NAME)
+    return audio_station.remote_player_play_songs(player_id, songs, mode, play_directly)
 
-        mode = QueueMode.replace
-        play_directly = True
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_play_album, player_uuid, album_name,
-                                                      album_artist, SongSortMode.track, mode, play_directly)
-        LOGGER.info(res)
+def remote_update_play_artist(audio_station: SynoAudioStation, player_id: str, data: ReadOnlyDict) -> bool:
+    artist = data.get(const.SERVICE_INPUT_ARTIST)
+    mode = QueueMode.replace
+    play_directly = True
 
-    async def remote_player_control(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
+    return audio_station.remote_player_play_artist(player_id, artist, SongSortMode.album, mode, play_directly)
 
-        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
-        action = RemotePlayerAction(call.data.get(const.SERVICE_INPUT_ACTION))
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_control, player_uuid, action)
-        LOGGER.info(res)
+def remote_update_play_album(audio_station: SynoAudioStation, player_id: str, data: ReadOnlyDict) -> bool:
+    album_artist = data.get(const.SERVICE_INPUT_ALBUM_ARTIST)
+    album_name = data.get(const.SERVICE_INPUT_ALBUM_NAME)
 
-    async def remote_player_jump_to_song(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
+    mode = QueueMode.replace
+    play_directly = True
 
-        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
-        position = int(call.data.get(const.SERVICE_INPUT_POSITION))
+    return audio_station.remote_player_play_album(player_id, album_name,
+                                                  album_artist, SongSortMode.track, mode, play_directly)
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_jump_to_song, player_uuid, position)
-        LOGGER.info(res)
 
-    async def remote_player_volume(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
+def remote_player_shuffle(audio_station: SynoAudioStation, player_id: str, data: ReadOnlyDict) -> bool:
+    shuffle_mode = data.get(const.SERVICE_INPUT_SHUFFLE)
 
-        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
-        volume = call.data.get(const.SERVICE_INPUT_VOLUME)
-        res = await self._hass.async_add_executor_job(audio.remote_player_volume, player_uuid, volume)
-        LOGGER.info(res)
+    return audio_station.remote_player_shuffle(player_id, shuffle_mode)
 
-    async def remote_player_clear_playlist(self, call: ServiceCall) -> None:
-        audio = self.__resolve_audio_station(call)
-        if not audio:
-            return
 
-        player_uuid = call.data.get(const.SERVICE_INPUT_PLAYERUUID)
+def remote_player_control(audio_station: SynoAudioStation, player_id: str, data: ReadOnlyDict) -> bool:
+    action = RemotePlayerAction(data.get(const.SERVICE_INPUT_ACTION))
 
-        res = await self._hass.async_add_executor_job(audio.remote_player_clear_playlist, player_uuid)
-        LOGGER.info(res)
+    return audio_station.remote_player_control(player_id, action)
+
+
+def remote_player_jump_to_song(audio_station: SynoAudioStation, player_id: str, data: ReadOnlyDict) -> bool:
+    position = int(data.get(const.SERVICE_INPUT_POSITION))
+
+    return audio_station.remote_player_jump_to_song(player_id, position)
+
+
+def remote_player_volume(audio_station: SynoAudioStation, player_id: str, data: ReadOnlyDict) -> bool:
+    volume = data.get(const.SERVICE_INPUT_VOLUME)
+    return audio_station.remote_player_volume(player_id, volume)
+
+
+def remote_player_clear_playlist(audio_station: SynoAudioStation, player_id: str,
+                                 data: ReadOnlyDict) -> bool:
+    return audio_station.remote_player_clear_playlist(player_id)

@@ -2,48 +2,39 @@ get_player_status:
   name: Get player status
   description: Get current player status
   fields:
-    serial:
-      name: Serial
-      description: serial of the NAS to reboot; required when multiple NAS are configured.
-      example: 1NDVC86409
-      selector:
-        text:
-    player_uuid:
-      name: Player uuid
-      description: UUID of target player
-      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
       required: true
       selector:
-        text:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
 
 
 get_players:
   name: Get players
   description: Get list of available players
-  serial:
-    name: Serial
-    description: serial of the NAS to reboot; required when multiple NAS are configured.
-    example: 1NDVC86409
-    selector:
-      text:
+  fields:
+    serial:
+      name: Serial
+      description: Serial of which you want to log available players
+      example: 1NDVC86409
+      selector:
+        text:
 
 remote_player_play_songs:
   name: Play songs on remote player
   description: PLay songs on remote player using their id's
   fields:
-    serial:
-      name: Serial
-      description: serial of the NAS to reboot; required when multiple NAS are configured.
-      example: 1NDVC86409
-      selector:
-        text:
-    player_uuid:
-      name: Player uuid
-      description: UUID of target player
-      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
       required: true
       selector:
-        text:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
     songs:
       name: Song ids
       description: Ids of the songs you want to play (splitted by ,)
@@ -57,19 +48,14 @@ remote_player_play_artist:
   name: Play artist on remote player
   description: Play artist on remote player using artist name
   fields:
-    serial:
-      name: Serial
-      description: serial of the NAS to reboot; required when multiple NAS are configured.
-      example: 1NDVC86409
-      selector:
-        text:
-    player_uuid:
-      name: Player uuid
-      description: UUID of target player
-      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
       required: true
       selector:
-        text:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
     artist:
       name: Artist
       description: Artist
@@ -82,19 +68,14 @@ remote_player_play_album:
   name: Play album on remote player
   description: Play album on remote player using album name and album artist
   fields:
-    serial:
-      name: Serial
-      description: serial of the NAS to reboot; required when multiple NAS are configured.
-      example: 1NDVC86409
-      selector:
-        text:
-    player_uuid:
-      name: Player uuid
-      description: UUID of target player
-      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
       required: true
       selector:
-        text:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
     album_name:
       name: Album name
       description: Name of the album
@@ -114,19 +95,14 @@ remote_player_control:
   name: Control remote player
   description: Control remote player playing status
   fields:
-    serial:
-      name: Serial
-      description: serial of the NAS to reboot; required when multiple NAS are configured.
-      example: 1NDVC86409
-      selector:
-        text:
-    player_uuid:
-      name: Player uuid
-      description: UUID of target player
-      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
       required: true
       selector:
-        text:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
     action:
       name: Action
       description: Action for current playing media status
@@ -143,19 +119,14 @@ remote_player_jump_to_song:
   name: Change currently playing song to position in playlist
   description: Change currently playing song to position in playlist
   fields:
-    serial:
-      name: Serial
-      description: serial of the NAS to reboot; required when multiple NAS are configured.
-      example: 1NDVC86409
-      selector:
-        text:
-    player_uuid:
-      name: Player uuid
-      description: UUID of target player
-      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
       required: true
       selector:
-        text:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
     position:
       name: Position
       description: Position in playlist
@@ -168,19 +139,14 @@ remote_player_volume:
   name: Control remote player volume
   description: Control remote player volume
   fields:
-    serial:
-      name: Serial
-      description: serial of the NAS to reboot; required when multiple NAS are configured.
-      example: 1NDVC86409
-      selector:
-        text:
-    player_uuid:
-      name: Player uuid
-      description: UUID of target player
-      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
       required: true
       selector:
-        text:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
     volume:
       name: Volume
       description: Volume of the player
@@ -192,21 +158,36 @@ remote_player_volume:
           max: 100
           mode: slider
 
+remote_player_shuffle:
+  name: Set shuffle mode for remote player
+  description: Set shuffle mode for remote player
+  fields:
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
+      required: true
+      selector:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
+    shuffle:
+      name: Shuffle
+      description: Enable / Disable shufle
+      required: true
+      selector:
+        boolean:
+
+
 remote_player_clear_playlist:
   name: Clear playlist of player
   description: Clear playlist of player
   fields:
-    serial:
-      name: Serial
-      description: serial of the NAS to reboot; required when multiple NAS are configured.
-      example: 1NDVC86409
-      selector:
-        text:
-    player_uuid:
-      name: Player uuid
-      description: UUID of target player
-      example: abc5e7ec-96dc-116e-0080-0006785ac8ae
+    player_id:
+      name: Player
+      description: Select player you want to execute call on
       required: true
       selector:
-        text:
+        entity:
+          integration: synology_dsaudio
+          domain: media_player
 

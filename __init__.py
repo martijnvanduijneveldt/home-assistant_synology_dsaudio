@@ -1,7 +1,10 @@
 """The Synology DSM component."""
 from __future__ import annotations
 
+from itertools import chain
 from typing import Any
+
+from homeassistant.helpers.device_registry import DeviceEntry
 
 from .synology_dsm.exceptions import (
     SynologyDSMLogin2SARequiredException,
@@ -27,7 +30,6 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .services import DsAudioServices
 from .api.SynoApi import SynoApi
 from .const import (
     DEFAULT_VERIFY_SSL,
@@ -36,6 +38,7 @@ from .const import (
     EXCEPTION_UNKNOWN,
     SYNO_API,
 )
+from .services import async_setup_services
 
 CONFIG_SCHEMA = cv.removed(DOMAIN, raise_if_present=False)
 
@@ -78,80 +81,54 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady(details) from err
 
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.unique_id] = {
-        # UNDO_UPDATE_LISTENER: entry.add_update_listener(_async_update_listener),
+    hass.data[DOMAIN][entry.entry_id] = {
         SYNO_API: api,
     }
 
-    # hass.data[DOMAIN]["devices"] = devices
+    # hass.config_entries.async_setup_platforms(entry, PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    hass.config_entries.async_setup_platforms(entry, PLATFORMS)
 
     # Services
-    ds_service = DsAudioServices(hass)
-    await ds_service.async_register()
-
-    # For SSDP compat
-    if not entry.data.get(CONF_MAC):
-        network = await hass.async_add_executor_job(getattr, api.dsm, "network")
-        hass.config_entries.async_update_entry(
-            entry, data={**entry.data, CONF_MAC: network.macs}
-        )
+    await async_setup_services(hass)
 
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload Synology DSM sensors."""
+async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        config_entry, PLATFORMS
+    )
 
-    entry_data = hass.data[DOMAIN][entry.unique_id]
-    # entry_data[UNDO_UPDATE_LISTENER]()
-    await entry_data[SYNO_API].async_unload()
-    hass.data[DOMAIN].pop(entry.unique_id)
+    if unload_ok:
+        hass.data[DOMAIN].pop(config_entry.entry_id)
 
-    return True
+    return unload_ok
 
 
-class SynologyDSMBaseEntity(CoordinatorEntity):
-    """Representation of a Synology NAS entry."""
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
-    entity_description: EntityDescription
-    unique_id: str
-    _attr_attribution = ATTRIBUTION
 
-    def __init__(
-            self,
-            api: SynoApi,
-            coordinator: DataUpdateCoordinator[dict[str, dict[str, Any]]],
-            description: EntityDescription,
-    ) -> None:
-        """Initialize the Synology DSM entity."""
-        super().__init__(coordinator)
-        self.entity_description = description
+async def async_remove_config_entry_device(
+        hass: HomeAssistant, entry: ConfigEntry, device_entry: DeviceEntry
+) -> bool:
+    """Remove synology_dsm config entry from a device."""
+    api: SynoApi = hass.data[DOMAIN][entry.entry_id].SYNO_API
+    serial = api.information.serial
 
-        self._api = api
-        self._attr_name = f"{api.information.model} {description.name}"
-        self._attr_unique_id: str = (
-            f"{api.information.serial}_{api.information.API_KEY}:{description.key}"
+    current = await hass.async_add_executor_job(api.dsm.audio_station.remote_player_get_players)
+
+    device_ids = chain(
+        (player.id for player in current),
+    )
+
+    return not device_entry.identifiers.intersection(
+        (
+            (DOMAIN, serial),  # Base device
+            *((DOMAIN, f"{serial}_{id}") for id in device_ids),  # Storage and cameras
         )
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return the device information."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._api.information.serial)},
-            name="Synology NAS",
-            manufacturer="Synology",
-            model=self._api.information.model,
-            sw_version=self._api.information.version_string,
-            configuration_url=self._api.config_url,
-        )
-
-    async def async_added_to_hass(self) -> None:
-        """Register entity for updates from API."""
-        self.async_on_remove(
-            self._api.subscribe(self.entity_description.api_key, self.unique_id)
-        )
-        await super().async_added_to_hass()
-
+    )
 

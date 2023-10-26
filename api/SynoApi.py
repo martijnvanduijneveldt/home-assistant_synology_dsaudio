@@ -11,6 +11,8 @@ from homeassistant.const import (
     CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant, callback
+
+from ..synology_dsm.api.audio_station import SynoAudioStation
 from ..synology_dsm import SynologyDSM
 from ..synology_dsm.api.dsm.information import SynoDSMInformation
 from ..synology_dsm.exceptions import (
@@ -44,6 +46,8 @@ class SynoApi:
         # Should we fetch them
         self._fetching_entities: dict[str, set[str]] = {}
         self._with_information = True
+
+        LOGGER.debug("__name__ = " + __name__)
 
     async def async_setup(self) -> None:
         """Start interacting with the NAS."""
